@@ -1,254 +1,172 @@
-import tensorflow as tf
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from sklearn.datasets import make_regression
 import numpy as np
-from memory_profiler import memory_usage
-import time
-import pandas as pd
-import optuna
-from typing import Callable, List, Tuple, Dict, Any
-import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.utils import shuffle  # type: ignore
 
 
-def loss(X, y, w):
-    return np.sum((np.dot(X, w) - y) ** 2) / len(y)
+class LinearRegressionSGD:
+    def __init__(self):
+        self.weights = None
+        self.bias = 0.0
+        self.loss_history = []
+
+    @staticmethod
+    def compute_gradient(X_batch, y_batch, weights, bias, reg_type, reg_param):
+        m = X_batch.shape[0]
+        y_pred = np.dot(X_batch, weights) + bias
+        error = y_pred - y_batch
+
+        grad_weights = (2.0 / m) * np.dot(X_batch.T, error)
+        grad_bias = (2.0 / m) * np.sum(error)
+
+        if reg_type == 'l2':
+            grad_weights += reg_param * weights
+        elif reg_type == 'l1':
+            grad_weights += reg_param * np.sign(weights)
+        elif reg_type == 'elastic':
+            grad_weights += reg_param[0] * np.sign(weights) + reg_param[1] * weights
+
+        return grad_weights, grad_bias
+
+    @staticmethod
+    def compute_loss(X, y, weights, bias, reg_type, reg_param):
+        m = X.shape[0]
+        y_pred = np.dot(X, weights) + bias
+        mse = np.mean((y_pred - y) ** 2)
+
+        if reg_type == 'l2':
+            reg = reg_param * np.sum(weights ** 2) / (2 * m)
+        elif reg_type == 'l1':
+            reg = reg_param * np.sum(np.abs(weights)) / m
+        elif reg_type == 'elastic':
+            reg = (reg_param[0] * np.sum(np.abs(weights)) + reg_param[1] * np.sum(weights ** 2)) / m
+        else:
+            reg = 0.0
+
+        return mse + reg
+
+    @staticmethod
+    def get_learning_rate(initial_lr, schedule_type, epoch, **kwargs):
+        if schedule_type == 'constant':
+            return initial_lr
+        elif schedule_type == 'time':
+            decay_rate = kwargs.get('decay_rate', 0.1)
+            return initial_lr / (1 + decay_rate * epoch)
+        elif schedule_type == 'step':
+            step_size = kwargs.get('step_size', 10)
+            decay_rate = kwargs.get('decay_rate', 0.5)
+            return initial_lr * (decay_rate ** (epoch // step_size))
+        elif schedule_type == 'exponential':
+            decay_rate = kwargs.get('decay_rate', 0.01)
+            return initial_lr * np.exp(-decay_rate * epoch)
+        else:
+            return initial_lr
+
+    def fit(self, X, y, batch_size=32, epochs=100, learning_rate=0.01,
+            schedule_type='constant', reg_type=None, reg_param=0.0, **kwargs):
+
+        if self.weights is None:
+            self.weights = np.zeros(X.shape[1])
+
+        n_samples = X.shape[0]
+        self.loss_history = []
+
+        for epoch in range(epochs):
+            X_shuffled, y_shuffled = shuffle(X, y)
+            current_lr = self.get_learning_rate(learning_rate, schedule_type, epoch, **kwargs)
+
+            for i in range(0, n_samples, batch_size):
+                X_batch = X_shuffled[i:i + batch_size]
+                y_batch = y_shuffled[i:i + batch_size]
+
+                grad_weights, grad_bias = self.compute_gradient(
+                    X_batch, y_batch, self.weights, self.bias, reg_type, reg_param
+                )
+
+                self.weights -= current_lr * grad_weights
+                self.bias -= current_lr * grad_bias
+
+            epoch_loss = self.compute_loss(X, y, self.weights, self.bias, reg_type, reg_param)
+            self.loss_history.append(epoch_loss)
+
+        return self
+
+    def predict(self, X):
+        return np.dot(X, self.weights) + self.bias
 
 
-def gradient(X, y, w):
-    return 2 * np.dot(X.T, (np.dot(X, w) - y)) / len(y)
+# Пример использования
+if __name__ == "__main__":
+    from sklearn.datasets import make_regression
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import mean_squared_error
+    import matplotlib.pyplot as plt
 
+    # Генерация данных
+    X, y = make_regression(n_samples=1000, n_features=20, noise=0.1)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-def SGD(X, y, h, lambda_val, batch_size=20, learning_rate_schedule=None, max_iter=1000):
-    w = np.zeros(X.shape[1])  # инициализировать веса
-    Q = loss(X, y, w)  # инициализировать оценку функционала
+    # Эксперимент с разным размером батча
+    batch_sizes = [1, 32, X_train.shape[0]]
+    results = {}
 
-    for it in range(max_iter):
-        if learning_rate_schedule is not None:
-            h = learning_rate_schedule(it)
+    for bs in batch_sizes:
+        model = LinearRegressionSGD()
+        model.fit(X_train, y_train, batch_size=bs, epochs=100, learning_rate=0.01)
+        y_pred = model.predict(X_test)
+        mse = mean_squared_error(y_test, y_pred)
+        results[f'Batch Size {bs}'] = {
+            'mse': mse,
+            'loss_history': model.loss_history.copy()
+        }
 
-        batch_indices = np.random.choice(X.shape[0], size=batch_size, replace=False)
-        X_batch = X[batch_indices]
-        y_batch = y[batch_indices]
+    # Визуализация сходимости
+    plt.figure(figsize=(10, 6))
+    for label, data in results.items():
+        plt.plot(data['loss_history'], label=label)
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Сравнение сходимости для разных размеров батча')
+    plt.legend()
+    plt.show()
 
-        eps = loss(X_batch, y_batch, w)  # вычислить потерю
-        w = w - h * gradient(X_batch, y_batch, w)  # обновить вектор весов в направлении антиградиента
-        Q_new = lambda_val * eps + (1 - lambda_val) * Q  # оценить функционал
-
-        if np.abs(Q_new - Q) < 1e-6:  # проверить сходимость
-            break
-
-        Q = Q_new
-
-    return w
-
-
-def step_decay_schedule(initial_lr=0.1, decay_factor=0.5, step_size=10):
-    def schedule(epoch):
-        return initial_lr * (decay_factor ** np.floor(epoch / step_size))
-
-    return schedule
-
-
-def generate_data(n_samples: int = 1000, n_features: int = 10, noise: float = 0.1) -> Tuple[np.ndarray, np.ndarray]:
-    X, y = make_regression(n_samples=n_samples, n_features=n_features, noise=noise)
-    return X, y
-
-
-class LinearRegression(nn.Module):
-    def __init__(self, input_dim):
-        super().__init__()
-        self.linear = nn.Linear(input_dim, 1)
-        
-    def forward(self, x):
-        return self.linear(x)
-
-
-def create_learning_rate_schedules() -> Dict[str, Callable]:
-    def constant_lr(epoch: int) -> float:
-        return 0.01
-    
-    def step_decay(epoch: int) -> float:
-        initial_lr = 0.01
-        decay_factor = 0.5
-        step_size = 100
-        return initial_lr * (decay_factor ** (epoch // step_size))
-    
-    def exponential_decay(epoch: int) -> float:
-        initial_lr = 0.01
-        decay_rate = 0.001
-        return initial_lr * np.exp(-decay_rate * epoch)
-    
-    return {
-        'constant': constant_lr,
-        'step_decay': step_decay,
-        'exponential': exponential_decay
-    }
-
-
-def get_tensorflow_optimizers() -> List[tf.keras.optimizers.Optimizer]:
-    return [
-        tf.keras.optimizers.SGD(learning_rate=0.01),
-        tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9),
-        tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9, nesterov=True),
-        tf.keras.optimizers.Adagrad(learning_rate=0.01),
-        tf.keras.optimizers.RMSprop(learning_rate=0.01),
-        tf.keras.optimizers.Adam(learning_rate=0.01)
+    # Эксперимент с разными learning rate schedules
+    schedules = [
+        ('constant', {}),
+        ('time', {'decay_rate': 0.1}),
+        ('step', {'step_size': 30, 'decay_rate': 0.5}),
+        ('exponential', {'decay_rate': 0.01})
     ]
 
+    plt.figure(figsize=(10, 6))
+    for schedule_type, params in schedules:
+        model = LinearRegressionSGD()
+        model.fit(X_train, y_train, batch_size=32, epochs=100,
+                  learning_rate=0.1, schedule_type=schedule_type, **params)
+        plt.plot(model.loss_history, label=f'{schedule_type} schedule')
 
-def get_pytorch_optimizers(model: nn.Module) -> List[optim.Optimizer]:
-    return [
-        optim.SGD(model.parameters(), lr=0.01),
-        optim.SGD(model.parameters(), lr=0.01, momentum=0.9),
-        optim.SGD(model.parameters(), lr=0.01, momentum=0.9, nesterov=True),
-        optim.Adagrad(model.parameters(), lr=0.01),
-        optim.RMSprop(model.parameters(), lr=0.01),
-        optim.Adam(model.parameters(), lr=0.01)
-    ]
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Сравнение различных стратегий learning rate')
+    plt.legend()
+    plt.show()
 
-
-def train_tensorflow_model(X: np.ndarray, y: np.ndarray, optimizer: tf.keras.optimizers.Optimizer, 
-                         batch_size: int, epochs: int = 1000) -> Dict[str, Any]:
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.Dense(1, input_shape=(X.shape[1],))
-    ])
-    
-    model.compile(optimizer=optimizer, loss='mean_squared_error')
-    
-    start_mem = memory_usage(-1, interval=1, timeout=1)
-    start_time = time.time()
-    
-    history = model.fit(X, y, batch_size=batch_size, epochs=epochs, verbose=0)
-    
-    end_time = time.time()
-    end_mem = memory_usage(-1, interval=1, timeout=1)
-    
-    return {
-        'memory_used': max(end_mem) - max(start_mem),
-        'time_taken': end_time - start_time,
-        'weights': model.get_weights()[0].flatten(),
-        'loss': history.history['loss'][-1]
+    # Проверка регуляризации
+    reg_types = [None, 'l1', 'l2', 'elastic']
+    reg_params = {
+        'l1': 0.1,
+        'l2': 0.1,
+        'elastic': (0.05, 0.05)
     }
 
+    plt.figure(figsize=(10, 6))
+    for reg_type in reg_types:
+        model = LinearRegressionSGD()
+        model.fit(X_train, y_train, batch_size=32, epochs=100,
+                  learning_rate=0.01, reg_type=reg_type,
+                  reg_param=reg_params.get(reg_type, 0.0))
+        plt.plot(model.loss_history, label=f'Reg: {reg_type or "None"}')
 
-def train_pytorch_model(X: np.ndarray, y: np.ndarray, optimizer: optim.Optimizer, 
-                       batch_size: int, epochs: int = 1000) -> Dict[str, Any]:
-    model = LinearRegression(X.shape[1])
-    criterion = nn.MSELoss()
-    
-    X_tensor = torch.FloatTensor(X)
-    y_tensor = torch.FloatTensor(y).reshape(-1, 1)
-    
-    start_mem = memory_usage(-1, interval=1, timeout=1)
-    start_time = time.time()
-    
-    for epoch in range(epochs):
-        for i in range(0, len(X), batch_size):
-            batch_X = X_tensor[i:i+batch_size]
-            batch_y = y_tensor[i:i+batch_size]
-            
-            optimizer.zero_grad()
-            outputs = model(batch_X)
-            loss = criterion(outputs, batch_y)
-            loss.backward()
-            optimizer.step()
-    
-    end_time = time.time()
-    end_mem = memory_usage(-1, interval=1, timeout=1)
-    
-    return {
-        'memory_used': max(end_mem) - max(start_mem),
-        'time_taken': end_time - start_time,
-        'weights': model.linear.weight.data.numpy().flatten(),
-        'loss': loss.item()
-    }
-
-
-def objective(trial: optuna.Trial) -> float:
-    X, y = generate_data()
-    batch_size = trial.suggest_int('batch_size', 1, len(X))
-    learning_rate = trial.suggest_float('learning_rate', 1e-5, 1e-1, log=True)
-    
-    model = LinearRegression(X.shape[1])
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    
-    results = train_pytorch_model(X, y, optimizer, batch_size)
-    return results['loss']
-
-
-def plot_results(df: pd.DataFrame):
-    plt.figure(figsize=(15, 10))
-    
-    # Plot memory usage
-    plt.subplot(2, 2, 1)
-    sns.barplot(data=df, x='Method', y='Memory Used')
-    plt.xticks(rotation=45)
-    plt.title('Memory Usage by Method')
-    
-    # Plot time taken
-    plt.subplot(2, 2, 2)
-    sns.barplot(data=df, x='Method', y='Time Taken')
-    plt.xticks(rotation=45)
-    plt.title('Time Taken by Method')
-    
-    # Plot loss
-    plt.subplot(2, 2, 3)
-    sns.barplot(data=df, x='Method', y='Loss')
-    plt.xticks(rotation=45)
-    plt.title('Final Loss by Method')
-    
-    plt.tight_layout()
-    plt.savefig('optimization_results.png')
-    plt.close()
-
-
-def main():
-    # Generate data
-    X, y = generate_data(n_samples=1000, n_features=10)
-    
-    # Initialize results DataFrame
-    results = []
-    
-    # Test different batch sizes
-    batch_sizes = [1, 32, 64, 128, 256, 512, 1000]
-    for batch_size in batch_sizes:
-        # TensorFlow
-        for optimizer in get_tensorflow_optimizers():
-            results.append({
-                'Method': f'TF_{optimizer.__class__.__name__}_batch_{batch_size}',
-                **train_tensorflow_model(X, y, optimizer, batch_size)
-            })
-        
-        # PyTorch
-        model = LinearRegression(X.shape[1])
-        for optimizer in get_pytorch_optimizers(model):
-            results.append({
-                'Method': f'PT_{optimizer.__class__.__name__}_batch_{batch_size}',
-                **train_pytorch_model(X, y, optimizer, batch_size)
-            })
-    
-    # Convert results to DataFrame
-    df = pd.DataFrame(results)
-    
-    # Plot results
-    plot_results(df)
-    
-    # Print results
-    print("\nResults Summary:")
-    print(df.to_string())
-    
-    # Run Optuna optimization
-    study = optuna.create_study()
-    study.optimize(objective, n_trials=50)
-    
-    print("\nOptuna Optimization Results:")
-    print(f"Best batch size: {study.best_params['batch_size']}")
-    print(f"Best learning rate: {study.best_params['learning_rate']}")
-    print(f"Best loss: {study.best_value}")
-
-
-if __name__ == '__main__':
-    main()
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Влияние регуляризации на сходимость')
+    plt.legend()
+    plt.show()
