@@ -4,18 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e1f3cfb0-7d8e-4ba3-a6e3-d7253805d1d9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/metopt_lab_3.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/metopt_lab_3.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/analysis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/batch_size_analysis.png" beforeDir="false" afterPath="$PROJECT_DIR$/batch_size_analysis.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/batch_size_results.csv" beforeDir="false" afterPath="$PROJECT_DIR$/batch_size_results.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/optimizer_convergence.png" beforeDir="false" afterPath="$PROJECT_DIR$/optimizer_convergence.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/optimizer_metrics.png" beforeDir="false" afterPath="$PROJECT_DIR$/optimizer_metrics.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/optimizer_results.csv" beforeDir="false" afterPath="$PROJECT_DIR$/optimizer_results.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sgd_regression.py" beforeDir="false" afterPath="$PROJECT_DIR$/sgd_regression.py" afterDir="false" />
-    </list>
+    <list default="true" id="e1f3cfb0-7d8e-4ba3-a6e3-d7253805d1d9" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />

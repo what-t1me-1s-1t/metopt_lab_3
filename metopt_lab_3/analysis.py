@@ -245,7 +245,65 @@ def experiment_libraries():
     return results
 
 
+def experiment_regularization():
+    """
+    Эксперимент с разными типами регуляризации
+    """
+    regularizations = [None, 'l1', 'l2', 'elasticnet']  # Исправлено 'elastic' на 'elasticnet'
+    results = []
+    convergence_data = {}
+
+    common_batch_size = 32
+    common_max_epochs = 100
+    common_lr = 0.01
+    common_reg_strength = 0.01
+
+    for reg in regularizations:
+        print(f"\nРегуляризация: {reg if reg else 'none'}")
+        model = CustomSGDRegressor(
+            learning_rate=common_lr,
+            batch_size=common_batch_size,
+            max_epochs=common_max_epochs,
+            regularization=reg,
+            reg_strength=common_reg_strength,
+            random_state=42
+        )
+        model.fit(X_train_scaled, y_train)
+        y_pred = model.predict(X_test_scaled)
+        r2 = r2_score(y_test, y_pred)
+        mse_val = mse(y_test, y_pred)
+
+        results.append({
+            'Regularization': reg if reg else 'none',
+            'Batch Size': common_batch_size,
+            'R2 Score': r2,
+            'Training Time (s)': model.training_time,
+            'Avg Memory (MB)': np.mean(model.memory_usage) if model.memory_usage else 0,
+            'Operations': model.operation_count,
+            'Epochs': len(model.loss_history)
+        })
+        convergence_data[f'Regularization: {reg if reg else "none"}'] = model.loss_history
+
+        # Вывод в требуемом формате
+        print(f"  Размер батча: {common_batch_size}")
+        print(f"  Время обучения: {model.training_time:.3f} сек")
+        print(f"  Среднее использование памяти: {np.mean(model.memory_usage) if model.memory_usage else 0:.2f} МБ")
+        print(f"  Количество операций: {model.operation_count}")
+        print(f"  Точность (R2): {r2:.4f}")
+        print(f"  Финальная ошибка: {mse_val:.6f}\n")
+
+    df_results = pd.DataFrame(results)
+    print("\nРезультаты эксперимента с регуляризацией:")
+    print(df_results)
+    df_results.to_csv('regularization_results.csv', index=False)
+
+    plot_convergence(convergence_data, 'Сходимость для разных типов регуляризации', 'regularization_comparison.png')
+
+    return df_results
+
 if __name__ == "__main__":
     print("\nЗапуск экспериментов...")
     optimizer_results = experiment_optimizers()
+    print("\nТестирование разных типов регуляризации...")
+    regularization_results = experiment_regularization()
     library_results_df = experiment_libraries()
