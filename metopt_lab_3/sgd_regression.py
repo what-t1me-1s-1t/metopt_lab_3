@@ -92,11 +92,9 @@ class CustomSGDRegressor:
             self.weights -= current_lr * grad_w
             self.bias -= current_lr * grad_b
         elif self.optimizer == 'adagrad':
-            # Проверка формы градиентов
             grad_w = grad_w.reshape(-1, 1)
             self.accumulated_grads_w += grad_w ** 2
             self.accumulated_grads_b += grad_b ** 2
-            # Адаптивное обновление с учетом epsilon
             adaptive_lr_w = current_lr / (np.sqrt(self.accumulated_grads_w + self.epsilon))
             adaptive_lr_b = current_lr / (np.sqrt(self.accumulated_grads_b + self.epsilon))
             self.weights -= adaptive_lr_w * grad_w
