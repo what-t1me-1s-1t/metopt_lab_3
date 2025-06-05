@@ -19,7 +19,7 @@ class CustomSGDRegressor:
             lr_scheduler: str = 'constant',
             polynomial_degree: int = 1,
             random_state: int = 42,
-            epsilon: float = 1e-1  # Увеличено для AdaGrad
+            epsilon: float = 1e-1
     ):
         self.learning_rate = learning_rate
         self.batch_size = batch_size
@@ -93,7 +93,7 @@ class CustomSGDRegressor:
             self.bias -= current_lr * grad_b
         elif self.optimizer == 'adagrad':
             # Проверка формы градиентов
-            grad_w = grad_w.reshape(-1, 1)  # Гарантируем форму (n_features, 1)
+            grad_w = grad_w.reshape(-1, 1)
             self.accumulated_grads_w += grad_w ** 2
             self.accumulated_grads_b += grad_b ** 2
             # Адаптивное обновление с учетом epsilon
