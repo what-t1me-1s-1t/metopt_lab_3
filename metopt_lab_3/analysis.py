@@ -15,7 +15,7 @@ from sgd_regression import CustomSGDRegressor
 from sklearn.metrics import r2_score, mean_squared_error as mse
 import pandas as pd
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Отключает большинство сообщений TensorFlow
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # Установка seed для воспроизводимости результатов
 np.random.seed(42)
@@ -69,9 +69,8 @@ def experiment_optimizers():
     for opt_name in optimizers:
         print(f"\n{opt_name.upper()}:\n")
         for lr in learning_rates:
-            # Для AdaGrad увеличиваем learning_rate в 100 раз
             adjusted_lr = lr * 1000 if opt_name == 'adagrad' else lr
-            tol = 0 if opt_name == 'adagrad' else common_tol  # Отключаем раннюю остановку для AdaGrad
+            tol = 0 if opt_name == 'adagrad' else common_tol
             print(f"Learning rate = {lr}:")
             model = CustomSGDRegressor(
                 learning_rate=adjusted_lr,
@@ -79,7 +78,7 @@ def experiment_optimizers():
                 max_epochs=common_max_epochs,
                 optimizer=opt_name,
                 tol=tol,
-                regularization=None,  # Отключаем регуляризацию
+                regularization=None,
                 random_state=42
             )
             model.fit(X_train_scaled, y_train)
@@ -120,7 +119,7 @@ def experiment_libraries():
     """
     Сравнение эффективности библиотечных реализаций
     """
-    learning_rates = [0.001, 0.01, 0.1]  # Уменьшили learning rates для лучшей стабильности
+    learning_rates = [0.001, 0.01, 0.1]
     results = []
 
     common_max_epochs = 50
@@ -131,28 +130,28 @@ def experiment_libraries():
         print(f"\nLearning rate = {lr}:")
 
         # MOMENTUM + NESTEROV
-        X = np.random.rand(1000, 10)  # 1000 примеров, 10 признаков
-        y = np.random.rand(1000, 1)  # 1000 целевых значений
+        X = np.random.rand(1000, 10)
+        y = np.random.rand(1000, 1)
 
         # Создаём модель
         modelMN = Sequential([
-            Dense(64, activation='relu', input_shape=(10,)),  # Полносвязный слой
-            Dense(1)  # Выходной слой (регрессия)
+            Dense(64, activation='relu', input_shape=(10,)),
+            Dense(1)
         ])
 
         # Настраиваем оптимизатор SGD с Momentum и Nesterov
         optimizer = SGD(
             learning_rate=lr,
-            momentum=0.9,  # Momentum SGD
-            nesterov=True,  # Ускорение Нестерова
-            clipnorm=1.0  # Ограничение градиентов по норме
+            momentum=0.9,
+            nesterov=True,
+            clipnorm=1.0
         )
 
         # Компилируем модель
         modelMN.compile(
             optimizer=optimizer,
-            loss='mse',  # Среднеквадратичная ошибка (для регрессии)
-            metrics=['mae']  # Средняя абсолютная ошибка (опционально)
+            loss='mse',
+            metrics=['mae']
         )
 
         # Обучаем модель
@@ -160,7 +159,7 @@ def experiment_libraries():
             X, y,
             epochs=common_max_epochs,  # Количество эпох
             batch_size=common_batch_size,  # Размер батча
-            validation_split=0.2,  # 20% данных для валидации
+            validation_split=0.2,
             verbose=0
         )
 
@@ -168,23 +167,23 @@ def experiment_libraries():
 
         # Создаём модель
         modelMN = Sequential([
-            Dense(64, activation='relu', input_shape=(10,)),  # Полносвязный слой
-            Dense(1)  # Выходной слой (регрессия)
+            Dense(64, activation='relu', input_shape=(10,)),
+            Dense(1)
         ])
 
         # Наcтраиваем оптимизатор RMSProp
         optimizer = RMSprop(
             learning_rate=lr,
-            rho=0.9,  # Коэффициент затухания (по умолчанию 0.9)
-            momentum=0.0,  # Импульс (по умолчанию 0)
-            epsilon=1e-7  # Малое число для стабильности
+            rho=0.9,
+            momentum=0.0,
+            epsilon=1e-7
         )
 
         # Компилируем модель
         modelMN.compile(
             optimizer=optimizer,
-            loss='mse',  # Среднеквадратичная ошибка
-            metrics=['mae']  # Дополнительная метрика
+            loss='mse',
+            metrics=['mae']
         )
 
         # Обучаем модель
@@ -192,26 +191,26 @@ def experiment_libraries():
             X, y,
             epochs=common_max_epochs,
             batch_size=common_batch_size,
-            verbose=0  # Вывод прогресса
+            verbose=0
         )
 
         # Проверяем результат
         print(f"keras (RMSPROP) Loss: {history.history['loss'][-1]:.4f}")
 
         # Создаём синтетические данные
-        X = torch.randn(1000, 10)  # [1000 примеров, 10 признаков]
-        y = torch.randn(1000, 1)  # [1000 целей, 1 выход]
+        X = torch.randn(1000, 10)
+        y = torch.randn(1000, 1)
 
         # Инициализируем модель и оптимизатор
-        model = nn.Linear(10, 1)  # 2 входа, 1 выход
+        model = nn.Linear(10, 1)
         optimizer = optim.Adagrad(model.parameters(), lr=lr)
-        criterion = nn.MSELoss()  # Функция потерь
+        criterion = nn.MSELoss()
 
         resLoss = 0
         for epoch in range(50):
             optimizer.zero_grad()
-            outputs = model(X)  # Прямой проход
-            loss = criterion(outputs, y)  # Сравнение размерностей
+            outputs = model(X)
+            loss = criterion(outputs, y)
             loss.backward()
             optimizer.step()
             resLoss = loss.item()
@@ -249,7 +248,7 @@ def experiment_regularization():
     """
     Эксперимент с разными типами регуляризации
     """
-    regularizations = [None, 'l1', 'l2', 'elasticnet']  # Исправлено 'elastic' на 'elasticnet'
+    regularizations = [None, 'l1', 'l2', 'elasticnet']
     results = []
     convergence_data = {}
 
@@ -284,7 +283,6 @@ def experiment_regularization():
         })
         convergence_data[f'Regularization: {reg if reg else "none"}'] = model.loss_history
 
-        # Вывод в требуемом формате
         print(f"  Размер батча: {common_batch_size}")
         print(f"  Время обучения: {model.training_time:.3f} сек")
         print(f"  Среднее использование памяти: {np.mean(model.memory_usage) if model.memory_usage else 0:.2f} МБ")
